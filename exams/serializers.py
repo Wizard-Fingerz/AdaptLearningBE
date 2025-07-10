@@ -106,3 +106,19 @@ class ExamSubmissionSerializer(serializers.Serializer):
             raise serializers.ValidationError("All questions must be answered.")
         
         return data
+
+    def create(self, validated_data):
+        attempt = self.context['attempt']
+        answers_data = validated_data['answers']
+        # Remove previous answers for this attempt (if any)
+        attempt.answers.all().delete()
+        # Create new answers
+        for answer_data in answers_data:
+            Answer.objects.create(
+                attempt=attempt,
+                question=answer_data['question'],
+                answer_text=answer_data['answer_text']
+            )
+        attempt.is_completed = True
+        attempt.save()
+        return attempt

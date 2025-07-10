@@ -146,6 +146,12 @@ class ExamAttemptDetailView(generics.RetrieveAPIView):
 class ExamSubmissionView(generics.CreateAPIView):
     serializer_class = ExamSubmissionSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        attempt = ExamAttempt.objects.get(id=self.kwargs['pk'])
+        context['attempt'] = attempt
+        return context
     
     def perform_create(self, serializer):
         attempt = ExamAttempt.objects.get(id=self.kwargs['pk'])
