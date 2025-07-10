@@ -143,6 +143,9 @@ class ExamAttemptDetailView(generics.RetrieveAPIView):
     def get_queryset(self):
         return ExamAttempt.objects.filter(student=self.request.user)
 
+from rest_framework.response import Response
+from rest_framework import status
+
 class ExamSubmissionView(generics.CreateAPIView):
     serializer_class = ExamSubmissionSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -152,14 +155,25 @@ class ExamSubmissionView(generics.CreateAPIView):
         attempt = ExamAttempt.objects.get(id=self.kwargs['pk'])
         context['attempt'] = attempt
         return context
-    
-    def perform_create(self, serializer):
+
+    def create(self, request, *args, **kwargs):
         attempt = ExamAttempt.objects.get(id=self.kwargs['pk'])
         if attempt.student != self.request.user:
-            raise permissions.PermissionDenied("You can only submit your own exam attempts.")
+            return Response({"detail": "You can only submit your own exam attempts."}, status=status.HTTP_403_FORBIDDEN)
         if attempt.is_completed:
-            raise permissions.PermissionDenied("This exam attempt has already been completed.")
-        serializer.save(attempt=attempt)
+            return Response({"detail": "This exam attempt has already been completed."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        # After saving, return score and other info
+        attempt.refresh_from_db()
+        return Response({
+            "score": attempt.score,
+            "totalQuestions": attempt.exam.questions.count(),
+            "passingScore": attempt.exam.passing_marks,
+            "attemptId": attempt.id
+        }, status=status.HTTP_201_CREATED)
 
 class StaffExamListView(generics.ListAPIView):
     serializer_class = ExamSerializer
